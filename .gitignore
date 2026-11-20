@@ -1,0 +1,10 @@
+# raw and generated data are not part of the repository (see README, section 2)
+dataset/*/
+!dataset/utils/
+# model files are not included (see README, section 6)
+*.pt
+*.pkl
+models.pkl
+__pycache__/
+.DS_Store
+system/logs/

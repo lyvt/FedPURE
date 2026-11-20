@@ -1,0 +1,3 @@
+nslkdd_latejoin_fedus_s0 | 11 | -algo fedus -data nslkdd -dt noniid -dev cpu -nt none -npw 0 -psr 0 --seed 0 --round_to_add_clients 49 --exp_name r2_latejoin
+nslkdd_latejoin_fedus_s1 | 11 | -algo fedus -data nslkdd -dt noniid -dev cpu -nt none -npw 0 -psr 0 --seed 1 --round_to_add_clients 49 --exp_name r2_latejoin
+nslkdd_latejoin_fedus_s2 | 11 | -algo fedus -data nslkdd -dt noniid -dev cpu -nt none -npw 0 -psr 0 --seed 2 --round_to_add_clients 49 --exp_name r2_latejoin
