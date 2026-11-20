@@ -157,8 +157,15 @@ class FedUS(object):
 
             if epoch == self.global_rounds - 1:
                 self.log_l2_milestones()
-            self.receive_models()
-            self.aggregate_parameters()
+            # Phase 2 (final round) is strictly local: FedPURE uploads nothing and the server does
+            # not aggregate, so the global model stays the Phase-1 encoder theta_s^T. Clients are
+            # evaluated with their own models. Only the exchange_all / head_only ablations (which
+            # re-share after Phase 2) and single_phase (no Phase 2) aggregate in the final round.
+            phase2_local = (epoch == self.global_rounds - 1
+                            and self.ablation in ('none', 'joint_loss'))
+            if not phase2_local:
+                self.receive_models()
+                self.aggregate_parameters()
             if self.ablation in ('exchange_all', 'head_only'):
                 # the shared part is aggregated and deployed: clients keep the aggregated version
                 for client in self.selected_clients:
@@ -243,29 +250,30 @@ class FedUS(object):
                                             getattr(client.model, part).parameters()):
                 old_param.data = new_param.data.clone()
 
+    # parts of the model exchanged by FedPURE in Phase 1
+    FEDPURE_SHARED = ('encoder', 'decoder')
+
+    def copy_parts(self, client, parts):
+        for part in parts:
+            for new_param, old_param in zip(getattr(self.global_model, part).parameters(),
+                                            getattr(client.model, part).parameters()):
+                old_param.data.copy_(new_param.data)
+
     def send_models(self, epoch):
         assert len(self.clients) > 0
         if self.ablation != 'none':
             for client in self.selected_clients:
                 self.copy_shared(client)
             return
-        if epoch < self.round_to_add_clients:
-            for client in self.selected_clients:
-                client.set_parameters(self.global_model)
-        else:
-            for client in self.selected_clients:
-
-                # Client mới (client cuối) chỉ nhận encoder
+        # FedPURE broadcasts only the encoder-decoder (theta_s, gamma_s); the classifier head is
+        # never transmitted (it stays on the client and is re-initialized at the start of Phase 2).
+        for client in self.selected_clients:
+            if (epoch >= self.round_to_add_clients and self.round_to_add_clients > 0
+                    and client.id == self.num_clients - 1):
                 # Late-joining client (only when --round_to_add_clients > 0) receives the encoder only
-                if self.round_to_add_clients > 0 and client.id == self.num_clients - 1:
-                    for new_param, old_param in zip(
-                            self.global_model.encoder.parameters(),
-                            client.model.encoder.parameters()):
-                        old_param.data.copy_(new_param.data)
-
-                # Các client cũ nhận toàn bộ model
-                else:
-                    client.set_parameters(self.global_model)
+                self.copy_parts(client, ('encoder',))
+            else:
+                self.copy_parts(client, self.FEDPURE_SHARED)
             
             # print("Client ", client.id)
             # client.local_initialization(self.global_model)
@@ -292,6 +300,18 @@ class FedUS(object):
 
     def aggregate_parameters(self):
         assert (len(self.uploaded_models) > 0)
+
+        if self.ablation in ('none', 'joint_loss'):
+            # FedPURE: clients upload only the encoder-decoder; the server averages these parts
+            # (eq. phase1-agg) and leaves the rest of the global model untouched.
+            for part in self.FEDPURE_SHARED:
+                for p in getattr(self.global_model, part).parameters():
+                    p.data.zero_()
+                for w, client_model in zip(self.uploaded_weights, self.uploaded_models):
+                    for sp, cp in zip(getattr(self.global_model, part).parameters(),
+                                      getattr(client_model, part).parameters()):
+                        sp.data += cp.data.clone() * w
+            return
 
         self.global_model = copy.deepcopy(self.uploaded_models[0])
         for param in self.global_model.parameters():

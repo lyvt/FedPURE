@@ -42,8 +42,9 @@ def table6():
     print('Table 6 (NSL-KDD, pat): method | upload | params | download | params | MB/round | total MB')
     for a, cu, u, cd, d, r in rows:
         print(f'  {NAMES[a]:10s} {cu:9s} {u:>7,} {cd:9s} {d:>7,}  {mb(u + d):.5f}  {mb(u + d) * r:.3f}')
-    print(f"  {'FedPURE':10s} {'full':9s} {full:>7,} {'full':9s} {full:>7,}  {mb(2 * full):.5f}  "
-          f"{mb(full) * (2 * 49 + 1):.3f}   (49 rounds up+down, one final download)")
+    ed = enc + n_params(ae.decoder)  # FedPURE exchanges the encoder-decoder only
+    print(f"  {'FedPURE':10s} {'enc+dec':9s} {ed:>7,} {'enc+dec':9s} {ed:>7,}  {mb(2 * ed):.5f}  "
+          f"{mb(ed) * (2 * 49 + 1):.3f}   (49 rounds up+down, one final download)")
     print(f'  FedCorr, noisy client (no Stage 2, 45 rounds): {mb(2 * net) * 45:.3f} MB')
 
 
